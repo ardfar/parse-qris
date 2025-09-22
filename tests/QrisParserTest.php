@@ -80,6 +80,45 @@ class QrisParserTest extends TestCase
         $this->parser->parseFromImage('/non/existent/path.jpg');
     }
 
+    public function testParseFromImageSuccess(): void
+    {
+        // Skip this test if QR generation is not available
+        if (!class_exists('chillerlan\QRCode\QRCode')) {
+            $this->markTestSkipped('QR generation library not available');
+        }
+
+        $qrisString = "00020101021126680016ID.CO.TELKOM.WWW011893600898026635207502150001952663520750303UMI51440014ID.CO.QRIS.WWW0215ID10211254059720303UMI5204549953033605502015802ID5906BIOLBE6011KAB. MALANG610565168622005091147938120703A03630404CB";
+        
+        // Create a temporary QR code image
+        $options = new \chillerlan\QRCode\QROptions([
+            'version'    => \chillerlan\QRCode\QRCode::VERSION_AUTO,
+            'outputType' => \chillerlan\QRCode\QRCode::OUTPUT_IMAGICK,
+            'eccLevel'   => \chillerlan\QRCode\QRCode::ECC_L,
+        ]);
+        
+        $qrCode = new \chillerlan\QRCode\QRCode($options);
+        $qrData = $qrCode->render($qrisString);
+        
+        $tempImagePath = sys_get_temp_dir() . '/test_qr_' . uniqid() . '.png';
+        file_put_contents($tempImagePath, $qrData);
+        
+        try {
+            // Test that we can parse the image
+            $result = $this->parser->parseFromImage($tempImagePath);
+            
+            // Verify the parsed data
+            $this->assertEquals('BIOLBE', $result->merchant_name);
+            $this->assertEquals('KAB. MALANG', $result->merchant_city);
+            $this->assertEquals('ID', $result->country_code);
+            $this->assertNotNull($result->merchant_information_26);
+            $this->assertEquals('ID.CO.TELKOM.WWW', $result->merchant_information_26['global_unique_identifier']);
+            
+        } finally {
+            // Clean up the temporary file
+            @unlink($tempImagePath);
+        }
+    }
+
     public function testQrisDataToArray(): void
     {
         $qrisString = "00020101021126680016ID.CO.TELKOM.WWW011893600898026635207502150001952663520750303UMI51440014ID.CO.QRIS.WWW0215ID10211254059720303UMI5204549953033605502015802ID5906BIOLBE6011KAB. MALANG610565168622005091147938120703A03630404CB";

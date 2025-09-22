@@ -13,7 +13,8 @@
     "require": {
         "php": "^8.0",
         "illuminate/support": "^8.0|^9.0|^10.0|^11.0",
-        "chillerlan/php-qrcode": "^4.3"
+        "chillerlan/php-qrcode": "^4.3",
+        "khanamiryan/qrcode-detector-decoder": "*"
     },
     "require-dev": {
         "phpunit/phpunit": "^9.0|^10.0",

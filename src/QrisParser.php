@@ -5,6 +5,7 @@ namespace Ardfar\ParseQris;
 use Ardfar\ParseQris\Data\QrisData;
 use Ardfar\ParseQris\Data\QrisTag;
 use Ardfar\ParseQris\Exceptions\QrisParseException;
+use Zxing\QrReader;
 
 class QrisParser
 {
@@ -17,7 +18,7 @@ class QrisParser
 
     /**
      * Parse QRIS information from an image file
-     * Uses chillerlan/php-qrcode library for QR code detection and decoding
+     * Uses khanamiryan/qrcode-detector-decoder library for QR code detection and decoding
      */
     public function parseFromImage(string $imagePath): QrisData
     {
@@ -31,28 +32,22 @@ class QrisParser
         }
 
         try {
-            // Load the image based on its type
-            $image = match ($imageInfo[2]) {
-                IMAGETYPE_JPEG => imagecreatefromjpeg($imagePath),
-                IMAGETYPE_PNG => imagecreatefrompng($imagePath),
-                IMAGETYPE_GIF => imagecreatefromgif($imagePath),
-                IMAGETYPE_BMP => imagecreatefrombmp($imagePath),
-                default => throw QrisParseException::invalidImageFormat()
-            };
+            // Use the QrReader library to decode QR code from the image
+            $qrReader = new QrReader($imagePath, QrReader::SOURCE_TYPE_FILE);
+            $qrText = $qrReader->text();
 
-            if (!$image) {
-                throw QrisParseException::qrCodeReadError('Failed to load image');
+            if ($qrText === false || $qrText === null) {
+                $error = $qrReader->getError();
+                $errorMessage = $error ? $error->getMessage() : 'No QR code found in the image';
+                throw QrisParseException::qrCodeNotFound();
             }
 
-            // For now, we'll provide a placeholder that explains how to use with QR decoder
-            // In a real implementation, you would use a QR detection library here
-            imagedestroy($image);
+            // Parse the decoded QR text as QRIS string
+            return $this->parseFromString($qrText);
             
-            throw QrisParseException::qrCodeReadError(
-                'QR code reading from images requires additional setup. ' .
-                'Please install a QR code decoder library like "khanamiryan/qrcode-detector-decoder" ' .
-                'and decode the QR code manually, then use parseFromString() method.'
-            );
+        } catch (QrisParseException $e) {
+            // Re-throw QRIS exceptions as-is
+            throw $e;
         } catch (\Exception $e) {
             throw QrisParseException::qrCodeReadError($e->getMessage());
         }
