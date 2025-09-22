@@ -3,10 +3,16 @@
 // Simple test runner to validate our implementation
 // This runs basic tests without requiring full PHPUnit installation
 
-require_once __DIR__ . '/src/Data/QrisTag.php';
-require_once __DIR__ . '/src/Data/QrisData.php';
-require_once __DIR__ . '/src/Exceptions/QrisParseException.php';
-require_once __DIR__ . '/src/QrisParser.php';
+// Try to load composer autoloader for full dependency access
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+} else {
+    // Fallback to manual includes
+    require_once __DIR__ . '/src/Data/QrisTag.php';
+    require_once __DIR__ . '/src/Data/QrisData.php';
+    require_once __DIR__ . '/src/Exceptions/QrisParseException.php';
+    require_once __DIR__ . '/src/QrisParser.php';
+}
 
 use Ardfar\ParseQris\QrisParser;
 use Ardfar\ParseQris\Data\QrisData;
@@ -28,6 +34,7 @@ class SimpleTestRunner
         $this->testAdditionalData();
         $this->testEmptyString();
         $this->testImageFileNotFound();
+        $this->testImageParsing();
         $this->testDataConversion();
         $this->testValueDecoding();
 
@@ -167,6 +174,67 @@ class SimpleTestRunner
             
             if (!$exceptionThrown) {
                 throw new Exception("Expected QrisParseException to be thrown");
+            }
+        });
+    }
+
+    private function testImageParsing(): void
+    {
+        $this->test("Parse QRIS from Image", function () {
+            // First, create a test QR image with QRIS data
+            $qrisString = "00020101021126680016ID.CO.TELKOM.WWW011893600898026635207502150001952663520750303UMI51440014ID.CO.QRIS.WWW0215ID10211254059720303UMI5204549953033605502015802ID5906BIOLBE6011KAB. MALANG610565168622005091147938120703A03630404CB";
+            
+            try {
+                // Try to load QR generation library
+                if (!class_exists('chillerlan\QRCode\QRCode')) {
+                    throw new Exception("QR generation library not available - skipping image test");
+                }
+                
+                $options = new chillerlan\QRCode\QROptions([
+                    'version'    => chillerlan\QRCode\QRCode::VERSION_AUTO,
+                    'outputType' => chillerlan\QRCode\QRCode::OUTPUT_IMAGICK,
+                    'eccLevel'   => chillerlan\QRCode\QRCode::ECC_L,
+                ]);
+                
+                $qrCode = new chillerlan\QRCode\QRCode($options);
+                $qrData = $qrCode->render($qrisString);
+                
+                $testImagePath = '/tmp/test_qris_parsing.png';
+                file_put_contents($testImagePath, $qrData);
+                
+                // Verify image was created
+                if (!file_exists($testImagePath) || !getimagesize($testImagePath)) {
+                    throw new Exception("Failed to create test QR image");
+                }
+                
+                // Test parsing from image
+                $parser = new QrisParser();
+                $result = $parser->parseFromImage($testImagePath);
+                
+                // Verify the parsed data matches expected values
+                if ($result->merchant_name !== 'BIOLBE') {
+                    throw new Exception("Expected merchant name 'BIOLBE', got: " . $result->merchant_name);
+                }
+                
+                if ($result->merchant_city !== 'KAB. MALANG') {
+                    throw new Exception("Expected city 'KAB. MALANG', got: " . $result->merchant_city);
+                }
+                
+                if (!$result->merchant_information_26 || $result->merchant_information_26['global_unique_identifier'] !== 'ID.CO.TELKOM.WWW') {
+                    throw new Exception("Merchant information 26 parsing failed");
+                }
+                
+                // Clean up test file
+                @unlink($testImagePath);
+                
+            } catch (Exception $e) {
+                // If QR generation fails, test the image not found functionality
+                if (strpos($e->getMessage(), 'QR generation library not available') !== false) {
+                    // Skip this test gracefully
+                    echo " (SKIPPED - QR generation not available) ";
+                    return;
+                }
+                throw $e;
             }
         });
     }

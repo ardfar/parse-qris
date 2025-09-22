@@ -5,7 +5,7 @@ A Laravel library for parsing QRIS (Quick Response Code Indonesian Standard) inf
 ## Features
 
 - ✅ Parse QRIS information from decoded strings
-- 🖼️ Interface for parsing from QR code images (requires additional QR decoder library)
+- ✅ Parse QRIS information directly from QR code images
 - 📊 Extract comprehensive merchant information
 - 💰 Transaction and payment details parsing
 - 🏷️ Support for all standard QRIS tags
@@ -93,15 +93,17 @@ $array = $qrisData->toArray();
 $json = $qrisData->toJson();
 ```
 
-### Parsing from Images (Future Feature)
+### Parsing from Images
 
 ```php
 try {
     $qrisData = QrisParser::parseFromImage('/path/to/qr-code-image.jpg');
+    
+    echo "Merchant: " . $qrisData->merchant_name . "\n";
+    echo "City: " . $qrisData->merchant_city . "\n";
+    
 } catch (QrisParseException $e) {
     echo "Error: " . $e->getMessage();
-    // Currently requires manual QR decoding
-    // You can use online tools or QR libraries to decode the image first
 }
 ```
 
@@ -174,13 +176,30 @@ The library throws `QrisParseException` for various error conditions:
 
 ## Image QR Code Reading
 
-For full image QR code reading functionality, you'll need to install an additional QR code decoder library:
+The library now includes built-in QR code reading functionality using the `khanamiryan/qrcode-detector-decoder` library. The `parseFromImage()` method can automatically detect and decode QR codes from image files in the following formats:
 
-```bash
-composer require khanamiryan/qrcode-detector-decoder
+- JPEG (.jpg, .jpeg)
+- PNG (.png)
+- GIF (.gif)
+- BMP (.bmp)
+
+### Usage Example
+
+```php
+use Ardfar\ParseQris\QrisParser;
+use Ardfar\ParseQris\Exceptions\QrisParseException;
+
+try {
+    $parser = new QrisParser();
+    $qrisData = $parser->parseFromImage('/path/to/qr-image.jpg');
+    
+    echo "Merchant: " . $qrisData->merchant_name . "\n";
+    echo "Amount: " . $qrisData->transaction_amount . "\n";
+    
+} catch (QrisParseException $e) {
+    echo "Error reading QR code: " . $e->getMessage() . "\n";
+}
 ```
-
-Then the `parseFromImage()` method will be able to automatically detect and decode QR codes from images.
 
 ## Testing
 
